@@ -1,0 +1,15 @@
+[
+  {
+    "id": "1",
+    "title": "Tattoo Healing Cream",
+    "description": "Cream for tattoo aftercare",
+    "code": "THC123",
+    "price": 25.99,
+    "status": true,
+    "stock": 100,
+    "category": "Tattoo Care",
+    "thumbnails": [
+      "https://beautygroup.lt/54916-large_default/tattoo-aftercare-lotion-recovery-887ml.jpg"
+    ]
+  }
+]
