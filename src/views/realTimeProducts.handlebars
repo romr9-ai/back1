@@ -8,7 +8,14 @@
 </head>
 <body>
   <h1>Productos en Tiempo Real</h1>
-  <ul id="products-list"></ul>
+  <ul id="products-list">
+    {{#each products}}
+      <li id="product-{{this.id}}">
+        {{this.title}} - {{this.price}} 
+        <button onclick="deleteProduct('{{this.id}}')">Eliminar</button>
+      </li>
+    {{/each}}
+  </ul>
 
   <form id="add-product-form">
     <input type="text" id="title" placeholder="Título" required />
@@ -18,18 +25,21 @@
 
   <script>
     const socket = io();
-
     const productList = document.getElementById('products-list');
     const form = document.getElementById('add-product-form');
 
     // Escucha los eventos de actualización
     socket.on('updateProducts', (data) => {
       if (data.delete) {
-        document.getElementById(`product-${data.delete}`).remove();
+        const productElement = document.getElementById(`product-${data.delete}`);
+        if (productElement) {
+          productElement.remove();
+        }
       } else {
         const li = document.createElement('li');
         li.id = `product-${data.id}`;
-        li.textContent = `${data.title} - ${data.price}`;
+        li.innerHTML = `${data.title} - ${data.price} 
+          <button onclick="deleteProduct('${data.id}')">Eliminar</button>`;
         productList.appendChild(li);
       }
     });
@@ -39,10 +49,14 @@
       e.preventDefault();
       const title = document.getElementById('title').value;
       const price = document.getElementById('price').value;
-
       socket.emit('newProduct', { title, price });
       form.reset();
     });
+
+    // Función para eliminar un producto
+    function deleteProduct(productId) {
+      socket.emit('deleteProduct', productId);
+    }
   </script>
 </body>
 </html>

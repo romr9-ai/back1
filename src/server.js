@@ -1,14 +1,13 @@
 const express = require('express');
 const handlebars = require('express-handlebars');
 const { Server } = require('socket.io');
-const http = require('http'); // Para crear el servidor HTTP
-const { router: productsRouter, setSocket } = require('./routes/products.routes');
-const cartsRouter = require('./routes/carts.routes');
+const http = require('http');
+const { readProducts, writeProducts } = require('./services/products.service');
 
 const app = express();
 const PORT = 8080;
 
-// Configuración del motor de plantillas Handlebars
+// Configuración de Handlebars
 app.engine('handlebars', handlebars.engine());
 app.set('view engine', 'handlebars');
 app.set('views', __dirname + '/views');
@@ -18,41 +17,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-// Rutas de la API
-app.use('/api/products', productsRouter);
-app.use('/api/carts', cartsRouter);
-
 // Rutas de vistas
-app.get('/', (req, res) => {
-  res.render('home', { title: 'Home' });
+app.get('/', async (req, res) => {
+  const products = readProducts(); // Obtener productos desde el servicio
+  res.render('home', { products });
 });
 
-app.get('/realtimeproducts', (req, res) => {
-  res.render('realTimeProducts', { title: 'Real-Time Products' });
+app.get('/realtimeproducts', async (req, res) => {
+  const products = readProducts(); // Obtener productos desde el servicio
+  res.render('realTimeProducts', { products });
 });
 
-// Crear servidor HTTP y configurar WebSocket
+// Configuración de WebSocket
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Configuración de WebSocket
 io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado');
 
-  // Escucha los eventos de productos
   socket.on('newProduct', (product) => {
-    console.log('Nuevo producto recibido:', product);
-    io.emit('updateProducts', product); // Actualiza la lista de productos en tiempo real
+    const products = readProducts();
+    product.id = Date.now().toString(); // Generar ID único
+    products.push(product);
+    writeProducts(products); // Actualizar archivo JSON
+    io.emit('updateProducts', product);
   });
 
   socket.on('deleteProduct', (productId) => {
-    console.log('Producto eliminado con ID:', productId);
-    io.emit('updateProducts', { delete: productId }); // Notifica a los clientes que se eliminó un producto
+    const products = readProducts();
+    const updatedProducts = products.filter((p) => p.id !== productId);
+    writeProducts(updatedProducts); // Actualizar archivo JSON
+    io.emit('updateProducts', { delete: productId });
   });
 });
-
-// Pasar el servidor WebSocket a las rutas
-setSocket(io);
 
 // Iniciar el servidor
 server.listen(PORT, () => {
