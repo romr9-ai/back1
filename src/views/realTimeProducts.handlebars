@@ -10,53 +10,80 @@
   <h1>Productos en Tiempo Real</h1>
   <ul id="products-list">
     {{#each products}}
-      <li id="product-{{this.id}}">
+      <li id="product-{{this._id}}">
         {{this.title}} - {{this.price}} 
-        <button onclick="deleteProduct('{{this.id}}')">Eliminar</button>
+        <button onclick="deleteProduct('{{this._id}}')">Eliminar</button>
       </li>
     {{/each}}
   </ul>
 
   <form id="add-product-form">
     <input type="text" id="title" placeholder="Título" required />
+    <input type="text" id="description" placeholder="Descripción" required />
+    <input type="text" id="code" placeholder="Código" required />
     <input type="number" id="price" placeholder="Precio" required />
+    <input type="number" id="stock" placeholder="Stock" required />
+    <input type="text" id="category" placeholder="Categoría" required />
     <button type="submit">Agregar Producto</button>
   </form>
 
   <script>
-    const socket = io();
-    const productList = document.getElementById('products-list');
-    const form = document.getElementById('add-product-form');
+  const socket = io();
+  const productList = document.getElementById('products-list');
+  const form = document.getElementById('add-product-form');
+  
+  // Almacena los productos renderizados para evitar duplicados
+  const renderedProducts = new Set();
 
-    // Escucha los eventos de actualización
-    socket.on('updateProducts', (data) => {
-      if (data.delete) {
-        const productElement = document.getElementById(`product-${data.delete}`);
-        if (productElement) {
-          productElement.remove();
-        }
-      } else {
-        const li = document.createElement('li');
-        li.id = `product-${data.id}`;
-        li.innerHTML = `${data.title} - ${data.price} 
-          <button onclick="deleteProduct('${data.id}')">Eliminar</button>`;
-        productList.appendChild(li);
+  // Inicializa el Set con los productos ya renderizados
+  document.querySelectorAll('#products-list li').forEach((item) => {
+    const productId = item.id.replace('product-', '');
+    renderedProducts.add(productId);
+  });
+
+  // Escucha los eventos de actualización
+  socket.on('updateProducts', (data) => {
+    if (data.delete) {
+      // Elimina el producto si fue borrado
+      const productElement = document.getElementById(`product-${data.delete}`);
+      if (productElement) {
+        productElement.remove();
+        renderedProducts.delete(data.delete); // Elimina del Set
       }
-    });
-
-    // Enviar datos al servidor cuando se agrega un producto
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const title = document.getElementById('title').value;
-      const price = document.getElementById('price').value;
-      socket.emit('newProduct', { title, price });
-      form.reset();
-    });
-
-    // Función para eliminar un producto
-    function deleteProduct(productId) {
-      socket.emit('deleteProduct', productId);
+    } else {
+      // Agrega un producto nuevo solo si no existe
+      if (!renderedProducts.has(data._id)) {
+        const li = document.createElement('li');
+        li.id = `product-${data._id}`;
+        li.innerHTML = `
+          ${data.title} - ${data.price} 
+          <button onclick="deleteProduct('${data._id}')">Eliminar</button>`;
+        productList.appendChild(li);
+        renderedProducts.add(data._id); // Agrega al Set
+      }
     }
-  </script>
+  });
+
+  // Enviar datos al servidor cuando se agrega un producto
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const product = {
+      title: document.getElementById('title').value,
+      description: document.getElementById('description').value,
+      code: document.getElementById('code').value,
+      price: parseFloat(document.getElementById('price').value),
+      stock: parseInt(document.getElementById('stock').value),
+      category: document.getElementById('category').value,
+    };
+    socket.emit('newProduct', product);
+    form.reset();
+  });
+
+  // Función para eliminar un producto
+  function deleteProduct(productId) {
+    socket.emit('deleteProduct', productId);
+  }
+</script>
+
 </body>
 </html>

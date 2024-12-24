@@ -2,13 +2,32 @@ const express = require('express');
 const handlebars = require('express-handlebars');
 const { Server } = require('socket.io');
 const http = require('http');
-const { readProducts, writeProducts } = require('./services/products.service');
+const connectDB = require('./config/db');
+const {
+  readProducts,
+  getProducts,
+  createProduct,
+  deleteProduct,
+  getProductById,
+} = require('./services/products.service');
+const cartRoutes = require('./routes/carts.router'); // Rutas para carritos
 
 const app = express();
 const PORT = 8080;
 
-// Configuración de Handlebars
-app.engine('handlebars', handlebars.engine());
+// Connect to the database
+connectDB();
+
+// Handlebars Configuration
+app.engine(
+  'handlebars',
+  handlebars.engine({
+    runtimeOptions: {
+      allowProtoPropertiesByDefault: true,
+      allowProtoMethodsByDefault: true,
+    },
+  })
+);
 app.set('view engine', 'handlebars');
 app.set('views', __dirname + '/views');
 
@@ -17,41 +36,76 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-// Rutas de vistas
+// View Routes
 app.get('/', async (req, res) => {
-  const products = readProducts(); // Obtener productos desde el servicio
-  res.render('home', { products });
+  const { limit = 10, page = 1, sort, query } = req.query;
+  try {
+    const products = await getProducts(Number(limit), Number(page), sort, query); // Productos con filtros, paginación, y ordenamiento
+    res.render('home', { products });
+  } catch (error) {
+    console.error('Error fetching products for home page:', error.message);
+    res.status(500).send('Error loading products');
+  }
 });
 
 app.get('/realtimeproducts', async (req, res) => {
-  const products = readProducts(); // Obtener productos desde el servicio
-  res.render('realTimeProducts', { products });
+  try {
+    const products = await readProducts(); // Productos en tiempo real
+    res.render('realTimeProducts', { products });
+  } catch (error) {
+    console.error('Error fetching products for real-time page:', error.message);
+    res.status(500).send('Error loading real-time products');
+  }
 });
 
-// Configuración de WebSocket
+app.get('/products/:pid', async (req, res) => {
+  const { pid } = req.params;
+  try {
+    const product = await getProductById(pid); // Detalles del producto
+    res.render('productDetails', { product });
+  } catch (error) {
+    console.error('Error fetching product by ID:', error.message);
+    res.status(500).send('Error loading product details');
+  }
+});
+
+// API Routes for carts
+app.use('/api/carts', cartRoutes);
+
+// WebSocket Configuration
 const server = http.createServer(app);
 const io = new Server(server);
 
 io.on('connection', (socket) => {
-  console.log('Nuevo cliente conectado');
+  console.log('New client connected');
 
-  socket.on('newProduct', (product) => {
-    const products = readProducts();
-    product.id = Date.now().toString(); // Generar ID único
-    products.push(product);
-    writeProducts(products); // Actualizar archivo JSON
-    io.emit('updateProducts', product);
+  socket.on('newProduct', async (product) => {
+    try {
+      const newProduct = await createProduct(product); // Crear producto
+      io.emit('updateProducts', newProduct);
+      console.log('Product added successfully:', newProduct);
+    } catch (error) {
+      console.error('Error creating product:', error.message);
+    }
   });
 
-  socket.on('deleteProduct', (productId) => {
-    const products = readProducts();
-    const updatedProducts = products.filter((p) => p.id !== productId);
-    writeProducts(updatedProducts); // Actualizar archivo JSON
-    io.emit('updateProducts', { delete: productId });
+  socket.on('deleteProduct', async (productId) => {
+    console.log('Attempting to delete product with ID:', productId);
+    try {
+      const result = await deleteProduct(productId); // Eliminar producto
+      if (result) {
+        io.emit('updateProducts', { delete: productId });
+        console.log('Product deleted successfully:', productId);
+      } else {
+        console.error('No product found with ID:', productId);
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error.message);
+    }
   });
 });
 
-// Iniciar el servidor
+// Start the server
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
