@@ -2,8 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const {
   getProducts,
-  createProduct,
   getProductById,
+  createProduct,
   updateProduct,
   deleteProduct,
 } = require('../services/products.service');
@@ -12,91 +12,64 @@ const router = express.Router();
 
 // Middleware para validar ObjectId
 const validateObjectId = (req, res, next) => {
-  const { pid } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(pid)) {
-    return res.status(400).json({ status: 'error', message: 'Invalid product ID format' });
+  const { id, pid } = req.params;
+  if ((id && !mongoose.Types.ObjectId.isValid(id)) || (pid && !mongoose.Types.ObjectId.isValid(pid))) {
+    return res.status(400).json({ status: 'error', message: 'Invalid ID format' });
   }
   next();
 };
 
-// Middleware para validar el cuerpo de los productos
-const validateProductBody = (req, res, next) => {
-  const { title, description, code, price, stock, category } = req.body;
-  if (!title || !description || !code || !price || !stock || !category) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'Missing required fields: title, description, code, price, stock, category',
-    });
-  }
-  next();
-};
-
-// ✅ GET /api/products - Obtener productos con paginación y filtros
+// GET /api/products - Obtener todos los productos
 router.get('/', async (req, res) => {
-  const { limit = 10, page = 1, sort, query } = req.query;
+  console.log('📌 GET /api/products request received');
   try {
-    const products = await getProducts(Number(limit), Number(page), sort, query);
-    res.json({
-      status: 'success',
-      payload: products.docs,
-      totalPages: products.totalPages,
-      prevPage: products.prevPage,
-      nextPage: products.nextPage,
-      page: products.page,
-      hasPrevPage: products.hasPrevPage,
-      hasNextPage: products.hasNextPage,
-      prevLink: products.hasPrevPage ? `/api/products?page=${products.prevPage}` : null,
-      nextLink: products.hasNextPage ? `/api/products?page=${products.nextPage}` : null,
-    });
+    const products = await getProducts();
+    console.log('✅ Productos encontrados:', products);
+    res.json({ status: 'success', payload: products });
   } catch (error) {
+    console.error('❌ Error al obtener productos:', error.message);
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// ✅ POST /api/products - Agregar nuevo producto
-router.post('/', validateProductBody, async (req, res) => {
+// GET /api/products/:id - Obtener un producto específico por ID
+router.get('/:id', validateObjectId, async (req, res) => {
   try {
-    const newProduct = await createProduct(req.body);
-    res.status(201).json({ status: 'success', product: newProduct });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
-
-// ✅ GET /api/products/:pid - Obtener un producto por ID
-router.get('/:pid', validateObjectId, async (req, res) => {
-  try {
-    const product = await getProductById(req.params.pid);
+    const product = await getProductById(req.params.id);
     if (!product) {
       return res.status(404).json({ status: 'error', message: 'Product not found' });
     }
-    res.json({ status: 'success', product });
+    res.json({ status: 'success', payload: product });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// ✅ PUT /api/products/:pid - Actualizar producto
-router.put('/:pid', validateObjectId, validateProductBody, async (req, res) => {
+// POST /api/products - Crear un nuevo producto
+router.post('/', async (req, res) => {
   try {
-    const updatedProduct = await updateProduct(req.params.pid, req.body);
-    if (!updatedProduct) {
-      return res.status(404).json({ status: 'error', message: 'Product not found' });
-    }
-    res.json({ status: 'success', product: updatedProduct });
+    const newProduct = await createProduct(req.body);
+    res.status(201).json({ status: 'success', payload: newProduct });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// ✅ DELETE /api/products/:pid - Eliminar producto
-router.delete('/:pid', validateObjectId, async (req, res) => {
+// PUT /api/products/:id - Actualizar un producto por ID
+router.put('/:id', validateObjectId, async (req, res) => {
   try {
-    const deletedProduct = await deleteProduct(req.params.pid);
-    if (!deletedProduct) {
-      return res.status(404).json({ status: 'error', message: 'Product not found' });
-    }
-    res.json({ status: 'success', message: 'Product deleted successfully' });
+    const updatedProduct = await updateProduct(req.params.id, req.body);
+    res.json({ status: 'success', payload: updatedProduct });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// DELETE /api/products/:id - Eliminar un producto por ID
+router.delete('/:id', validateObjectId, async (req, res) => {
+  try {
+    const deletedProduct = await deleteProduct(req.params.id);
+    res.json({ status: 'success', payload: deletedProduct });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }

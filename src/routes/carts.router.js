@@ -1,14 +1,8 @@
 const express = require('express');
-const {
-  getCartById,
-  createCart,
-  addProductToCart,
-  updateCart,
-  updateProductQuantityInCart,
-  removeProductFromCart,
-  clearCart,
-} = require('../services/carts.service');
 const mongoose = require('mongoose');
+const passport = require('passport');
+const CartRepository = require('../repositories/CartRepository'); // ✅ Asegurar que el import es correcto
+const { authorizeUser, authorizeAdmin } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
@@ -21,10 +15,10 @@ const validateObjectId = (req, res, next) => {
   next();
 };
 
-// GET /carts/:id - Obtener un carrito específico con productos poblados
-router.get('/:id', validateObjectId, async (req, res) => {
+// ✅ **Obtener un carrito específico**
+router.get('/:id', validateObjectId, passport.authenticate('jwt', { session: false }), authorizeUser, async (req, res) => {
   try {
-    const cart = await getCartById(req.params.id);
+    const cart = await CartRepository.getById(req.params.id);
     if (!cart) {
       return res.status(404).json({ status: 'error', message: 'Cart not found' });
     }
@@ -34,53 +28,64 @@ router.get('/:id', validateObjectId, async (req, res) => {
   }
 });
 
-// POST /carts - Crear un nuevo carrito
+// ✅ **Crear un nuevo carrito**
 router.post('/', async (req, res) => {
   try {
-    const newCart = await createCart();
+    const newCart = await CartRepository.create();
     res.status(201).json({ status: 'success', payload: newCart });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// PUT /carts/:id - Actualizar carrito con un nuevo array de productos
-router.put('/:id', validateObjectId, async (req, res) => {
+// ✅ **Agregar un producto al carrito (Solo usuarios)**
+router.post('/:id/products/:pid', validateObjectId, passport.authenticate('jwt', { session: false }), authorizeUser, async (req, res) => {
   try {
-    const updatedCart = await updateCart(req.params.id, req.body.products);
+    const updatedCart = await CartRepository.addProduct(req.params.id, req.params.pid, req.body.quantity || 1);
+    res.json({ status: 'success', payload: updatedCart });
+  } catch (error) {
+    console.error("❌ Error en addProductToCart:", error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ✅ **Actualizar carrito completo (Solo admins)**
+router.put('/:id', validateObjectId, passport.authenticate('jwt', { session: false }), authorizeAdmin, async (req, res) => {
+  try {
+    const updatedCart = await CartRepository.update(req.params.id, req.body.products);
     res.json({ status: 'success', payload: updatedCart });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// PUT /carts/:id/products/:pid - Actualizar cantidad de un producto en el carrito
-router.put('/:id/products/:pid', validateObjectId, async (req, res) => {
+// ✅ **Actualizar cantidad de un producto en el carrito (Solo usuarios)**
+router.put('/:id/products/:pid', validateObjectId, passport.authenticate('jwt', { session: false }), authorizeUser, async (req, res) => {
   try {
     if (!req.body.quantity || req.body.quantity <= 0) {
       return res.status(400).json({ status: 'error', message: 'Quantity must be greater than zero' });
     }
-    const updatedCart = await updateProductQuantityInCart(req.params.id, req.params.pid, req.body.quantity);
+    const updatedCart = await CartRepository.updateProductQuantity(req.params.id, req.params.pid, req.body.quantity);
     res.json({ status: 'success', payload: updatedCart });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// DELETE /carts/:id/products/:pid - Eliminar un producto específico del carrito
-router.delete('/:id/products/:pid', validateObjectId, async (req, res) => {
+// ✅ **Eliminar un producto del carrito (Solo usuarios)**
+router.delete('/:id/products/:pid', validateObjectId, passport.authenticate('jwt', { session: false }), authorizeUser, async (req, res) => {
   try {
-    const updatedCart = await removeProductFromCart(req.params.id, req.params.pid);
+    const updatedCart = await CartRepository.removeProduct(req.params.id, req.params.pid);
     res.json({ status: 'success', payload: updatedCart });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// DELETE /carts/:id - Vaciar el carrito por completo
-router.delete('/:id', validateObjectId, async (req, res) => {
+// ✅ **Vaciar el carrito (Solo admins)**
+router.delete('/:id', validateObjectId, passport.authenticate('jwt', { session: false }), authorizeAdmin, async (req, res) => {
   try {
-    const clearedCart = await clearCart(req.params.id);
+    const clearedCart = await CartRepository.clear(req.params.id);
     res.json({ status: 'success', payload: clearedCart });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });

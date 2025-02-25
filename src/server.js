@@ -39,7 +39,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 app.use(cookieParser());
-app.use(passport.initialize());
+app.use(passport.initialize()); // Inicializar passport
 
 // **Rutas de API**
 app.use('/api/sessions', sessionRoutes); // Manejo de usuarios y JWT
