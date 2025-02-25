@@ -8,23 +8,33 @@ const {
   removeProductFromCart,
   clearCart,
 } = require('../services/carts.service');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
-// GET /carts/:id - Get a specific cart with populated products
-router.get('/:id', async (req, res) => {
+// Middleware para validar ObjectId
+const validateObjectId = (req, res, next) => {
+  const { id, pid } = req.params;
+  if ((id && !mongoose.Types.ObjectId.isValid(id)) || (pid && !mongoose.Types.ObjectId.isValid(pid))) {
+    return res.status(400).json({ status: 'error', message: 'Invalid ID format' });
+  }
+  next();
+};
+
+// GET /carts/:id - Obtener un carrito específico con productos poblados
+router.get('/:id', validateObjectId, async (req, res) => {
   try {
     const cart = await getCartById(req.params.id);
     if (!cart) {
       return res.status(404).json({ status: 'error', message: 'Cart not found' });
     }
-    res.json(cart);
+    res.json({ status: 'success', payload: cart });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// POST /carts - Create a new cart
+// POST /carts - Crear un nuevo carrito
 router.post('/', async (req, res) => {
   try {
     const newCart = await createCart();
@@ -34,8 +44,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /carts/:id - Update cart with a new array of products
-router.put('/:id', async (req, res) => {
+// PUT /carts/:id - Actualizar carrito con un nuevo array de productos
+router.put('/:id', validateObjectId, async (req, res) => {
   try {
     const updatedCart = await updateCart(req.params.id, req.body.products);
     res.json({ status: 'success', payload: updatedCart });
@@ -44,9 +54,12 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// PUT /carts/:id/products/:pid - Update the quantity of a specific product in a cart
-router.put('/:id/products/:pid', async (req, res) => {
+// PUT /carts/:id/products/:pid - Actualizar cantidad de un producto en el carrito
+router.put('/:id/products/:pid', validateObjectId, async (req, res) => {
   try {
+    if (!req.body.quantity || req.body.quantity <= 0) {
+      return res.status(400).json({ status: 'error', message: 'Quantity must be greater than zero' });
+    }
     const updatedCart = await updateProductQuantityInCart(req.params.id, req.params.pid, req.body.quantity);
     res.json({ status: 'success', payload: updatedCart });
   } catch (error) {
@@ -54,8 +67,8 @@ router.put('/:id/products/:pid', async (req, res) => {
   }
 });
 
-// DELETE /carts/:id/products/:pid - Remove a specific product from the cart
-router.delete('/:id/products/:pid', async (req, res) => {
+// DELETE /carts/:id/products/:pid - Eliminar un producto específico del carrito
+router.delete('/:id/products/:pid', validateObjectId, async (req, res) => {
   try {
     const updatedCart = await removeProductFromCart(req.params.id, req.params.pid);
     res.json({ status: 'success', payload: updatedCart });
@@ -64,8 +77,8 @@ router.delete('/:id/products/:pid', async (req, res) => {
   }
 });
 
-// DELETE /carts/:id - Remove all products from the cart
-router.delete('/:id', async (req, res) => {
+// DELETE /carts/:id - Vaciar el carrito por completo
+router.delete('/:id', validateObjectId, async (req, res) => {
   try {
     const clearedCart = await clearCart(req.params.id);
     res.json({ status: 'success', payload: clearedCart });

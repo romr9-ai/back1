@@ -1,6 +1,5 @@
+require('dotenv').config();
 const jwt = require('jsonwebtoken');
-
-const SECRET_KEY = 'supersecretkey123'; // Cambia esto por una variable de entorno
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -9,7 +8,7 @@ const generateToken = (user) => {
       email: user.email,
       role: user.role,
     },
-    SECRET_KEY,
+    process.env.JWT_SECRET, // Usar variable de entorno
     { expiresIn: '1h' }
   );
 };

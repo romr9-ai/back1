@@ -1,9 +1,8 @@
 console.log('sessions.router.js is loaded');
 const express = require('express');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const passport = require('passport');
-const User = require('../models/User'); // Asegúrate de tener el modelo de usuario
+const UserDAO = require('../dao/UserDAO'); // ✅ Ruta correcta
 const { generateToken } = require('../utils/jwt');
 
 const router = express.Router();
@@ -13,28 +12,14 @@ router.post('/register', async (req, res) => {
   try {
     const { first_name, last_name, email, age, password } = req.body;
 
-    // Verificar si el usuario ya existe
-    const existingUser = await User.findOne({ email });
+    const existingUser = await UserDAO.findByEmail(email);
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Encriptar contraseña
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    const newUser = await UserDAO.createUser({ first_name, last_name, email, age, password });
 
-    // Crear nuevo usuario
-    const newUser = new User({
-      first_name,
-      last_name,
-      email,
-      age,
-      password: hashedPassword,
-      role: 'user', // Default role
-    });
-
-    await newUser.save();
-
-    res.status(201).json({ message: 'User registered successfully' });
+    res.status(201).json({ message: 'User registered successfully', user: newUser });
   } catch (error) {
     res.status(500).json({ message: 'Error registering user', error: error.message });
   }
@@ -44,16 +29,14 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await UserDAO.findByEmail(email);
 
     if (!user || !bcrypt.compareSync(password, user.password)) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generar token JWT
     const token = generateToken(user);
 
-    // Enviar el token en una cookie
     res.cookie('authToken', token, { httpOnly: true }).json({ message: 'Login successful', token });
   } catch (error) {
     res.status(500).json({ message: 'Error logging in', error: error.message });
@@ -66,8 +49,22 @@ router.post('/logout', (req, res) => {
 });
 
 // **Obtener usuario actual con JWT**
-router.get('/current', passport.authenticate('jwt', { session: false }), (req, res) => {
-  res.json({ user: req.user });
+router.get('/current', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Recargar usuario desde la base de datos para evitar errores en req.user
+    const user = await UserDAO.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching current user', error: error.message });
+  }
 });
 
 module.exports = router;

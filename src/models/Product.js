@@ -12,7 +12,7 @@ const productSchema = new mongoose.Schema({
   thumbnails: { type: [String], default: [] },
 });
 
-// Aplicar el plugin de paginación
+// ✅ Aplicar el plugin de paginación
 productSchema.plugin(mongoosePaginate);
 
 const Product = mongoose.model('Product', productSchema);

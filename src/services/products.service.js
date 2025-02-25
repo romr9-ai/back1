@@ -1,54 +1,84 @@
 const mongoose = require('mongoose');
-const Product = require('../models/Product');
+const ProductDAO = require('../dao/ProductDAO'); // ✅ Asegúrate de que la ruta sea correcta
 
-// Fetch all products from the database
+// Obtener productos con filtros, paginación y ordenamiento
+const getProducts = async (limit = 10, page = 1, sort, query) => {
+  try {
+    const filter = query ? { $or: [{ category: query }, { status: query }] } : {};
+    const options = {
+      limit: Number(limit),
+      page: Number(page),
+      sort: sort ? { price: sort === 'asc' ? 1 : -1 } : {},
+    };
+    return await ProductDAO.getPaginatedProducts(filter, options);
+  } catch (error) {
+    throw new Error(`❌ Error fetching paginated products: ${error.message}`);
+  }
+};
+
+// Obtener todos los productos sin filtros (solo para vistas)
 const readProducts = async () => {
   try {
-    return await Product.find().lean(); // Use lean() for better performance and compatibility with Handlebars
+    return await ProductDAO.getAllProducts();
   } catch (error) {
-    throw new Error('Error fetching products from the database');
+    throw new Error(`❌ Error fetching products: ${error.message}`);
   }
 };
 
-// Fetch products with filters, pagination, and sorting
-const getProducts = async (limit, page, sort, query) => {
-  const filter = query ? { $or: [{ category: query }, { status: query }] } : {};
-  const options = {
-    limit,
-    page,
-    sort: sort ? { price: sort === 'asc' ? 1 : -1 } : {},
-  };
-  return await Product.paginate(filter, options);
-};
-
-// Fetch a product by ID
+// Obtener un producto por ID
 const getProductById = async (id) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new Error('Invalid ID format');
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new Error('⚠️ Invalid product ID format');
+    }
+    return await ProductDAO.getProductById(id);
+  } catch (error) {
+    throw new Error(`❌ Error fetching product by ID: ${error.message}`);
   }
-  return await Product.findById(id);
 };
 
-// Create a new product
+// Crear un nuevo producto
 const createProduct = async (data) => {
-  const product = new Product(data);
-  return await product.save();
+  try {
+    console.log("📌 Data recibida en createProduct:", data);  // ✅ Depuración
+
+    const { title, description, price, stock, category, code } = data;
+
+    // ✅ Verificar que los campos requeridos existan
+    if (!title || !description || !price || !stock || !category || !code) {
+      throw new Error('⚠️ Missing required fields: title, description, price, stock, category, code');
+    }
+
+    return await ProductDAO.createProduct(data);
+  } catch (error) {
+    throw new Error(`❌ Error creating product: ${error.message}`);
+  }
 };
 
-// Update an existing product
+// Actualizar un producto existente
 const updateProduct = async (id, data) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new Error('Invalid ID format');
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new Error('⚠️ Invalid product ID format');
+    }
+
+    return await ProductDAO.updateProduct(id, data);
+  } catch (error) {
+    throw new Error(`❌ Error updating product: ${error.message}`);
   }
-  return await Product.findByIdAndUpdate(id, data, { new: true });
 };
 
-// Delete a product by ID
+// Eliminar un producto por ID
 const deleteProduct = async (id) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new Error('Invalid ID format');
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new Error('⚠️ Invalid product ID format');
+    }
+
+    return await ProductDAO.deleteProduct(id);
+  } catch (error) {
+    throw new Error(`❌ Error deleting product: ${error.message}`);
   }
-  return await Product.findByIdAndDelete(id);
 };
 
 module.exports = {

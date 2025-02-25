@@ -1,3 +1,5 @@
+require('dotenv').config(); // Cargar variables de entorno desde .env
+
 const express = require('express');
 const handlebars = require('express-handlebars');
 const { Server } = require('socket.io');
@@ -6,22 +8,20 @@ const passport = require('passport');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 
-const productRoutes = require('./routes/products.router'); // Rutas de productos
-const cartRoutes = require('./routes/carts.router'); // Rutas de carritos
+// Importar rutas
+const productRoutes = require('./routes/products.router');
+const cartRoutes = require('./routes/carts.router');
 const sessionRoutes = require('./routes/sessions.router');
-
-
-
 
 require('./config/passport'); // Configuración de Passport
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 8080; // Usa el puerto de .env o 8080 por defecto
 
-// Conectar a la base de datos
+// **Conectar a la base de datos**
 connectDB();
 
-// Configuración de Handlebars
+// **Configuración de Handlebars**
 app.engine(
   'handlebars',
   handlebars.engine({
@@ -34,7 +34,7 @@ app.engine(
 app.set('view engine', 'handlebars');
 app.set('views', __dirname + '/views');
 
-// Middleware
+// **Middleware**
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
@@ -79,35 +79,35 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 io.on('connection', (socket) => {
-  console.log('New client connected');
+  console.log('🟢 Nuevo cliente conectado');
 
   socket.on('newProduct', async (product) => {
     try {
       const newProduct = await createProduct(product);
       io.emit('updateProducts', newProduct);
-      console.log('Product added successfully:', newProduct);
+      console.log('✅ Producto agregado:', newProduct);
     } catch (error) {
-      console.error('Error creating product:', error.message);
+      console.error('❌ Error creando producto:', error.message);
     }
   });
 
   socket.on('deleteProduct', async (productId) => {
-    console.log('Attempting to delete product with ID:', productId);
+    console.log('🗑️ Eliminando producto con ID:', productId);
     try {
       const result = await deleteProduct(productId);
       if (result) {
         io.emit('updateProducts', { delete: productId });
-        console.log('Product deleted successfully:', productId);
+        console.log('✅ Producto eliminado:', productId);
       } else {
-        console.error('No product found with ID:', productId);
+        console.error('⚠️ No se encontró el producto con ID:', productId);
       }
     } catch (error) {
-      console.error('Error deleting product:', error.message);
+      console.error('❌ Error eliminando producto:', error.message);
     }
   });
 });
 
-// Iniciar el servidor
+// **Iniciar el servidor**
 server.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
 });

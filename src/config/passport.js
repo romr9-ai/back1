@@ -1,14 +1,13 @@
+require('dotenv').config();
 const passport = require('passport');
 const { ExtractJwt, Strategy } = require('passport-jwt');
 const User = require('../models/User');
 
-const SECRET_KEY = 'supersecretkey123'; // Cambia esto por una variable de entorno
-
 const jwtOptions = {
   jwtFromRequest: ExtractJwt.fromExtractors([
-    (req) => req.cookies.authToken, // Extraer token desde cookie
+    (req) => req.cookies.authToken, // Extraer token desde la cookie
   ]),
-  secretOrKey: SECRET_KEY,
+  secretOrKey: process.env.JWT_SECRET, // Usar variable de entorno
 };
 
 passport.use(

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const {
   getProducts,
   createProduct,
@@ -8,6 +9,27 @@ const {
 } = require('../services/products.service');
 
 const router = express.Router();
+
+// Middleware para validar ObjectId
+const validateObjectId = (req, res, next) => {
+  const { pid } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(pid)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid product ID format' });
+  }
+  next();
+};
+
+// Middleware para validar el cuerpo de los productos
+const validateProductBody = (req, res, next) => {
+  const { title, description, code, price, stock, category } = req.body;
+  if (!title || !description || !code || !price || !stock || !category) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Missing required fields: title, description, code, price, stock, category',
+    });
+  }
+  next();
+};
 
 // ✅ GET /api/products - Obtener productos con paginación y filtros
 router.get('/', async (req, res) => {
@@ -32,7 +54,7 @@ router.get('/', async (req, res) => {
 });
 
 // ✅ POST /api/products - Agregar nuevo producto
-router.post('/', async (req, res) => {
+router.post('/', validateProductBody, async (req, res) => {
   try {
     const newProduct = await createProduct(req.body);
     res.status(201).json({ status: 'success', product: newProduct });
@@ -42,9 +64,12 @@ router.post('/', async (req, res) => {
 });
 
 // ✅ GET /api/products/:pid - Obtener un producto por ID
-router.get('/:pid', async (req, res) => {
+router.get('/:pid', validateObjectId, async (req, res) => {
   try {
     const product = await getProductById(req.params.pid);
+    if (!product) {
+      return res.status(404).json({ status: 'error', message: 'Product not found' });
+    }
     res.json({ status: 'success', product });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
@@ -52,9 +77,12 @@ router.get('/:pid', async (req, res) => {
 });
 
 // ✅ PUT /api/products/:pid - Actualizar producto
-router.put('/:pid', async (req, res) => {
+router.put('/:pid', validateObjectId, validateProductBody, async (req, res) => {
   try {
     const updatedProduct = await updateProduct(req.params.pid, req.body);
+    if (!updatedProduct) {
+      return res.status(404).json({ status: 'error', message: 'Product not found' });
+    }
     res.json({ status: 'success', product: updatedProduct });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
@@ -62,9 +90,12 @@ router.put('/:pid', async (req, res) => {
 });
 
 // ✅ DELETE /api/products/:pid - Eliminar producto
-router.delete('/:pid', async (req, res) => {
+router.delete('/:pid', validateObjectId, async (req, res) => {
   try {
-    await deleteProduct(req.params.pid);
+    const deletedProduct = await deleteProduct(req.params.pid);
+    if (!deletedProduct) {
+      return res.status(404).json({ status: 'error', message: 'Product not found' });
+    }
     res.json({ status: 'success', message: 'Product deleted successfully' });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
